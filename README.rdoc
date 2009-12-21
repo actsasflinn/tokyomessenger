@@ -1,0 +1,223 @@
+= TokyoMessenger Ruby Client In C
+
+This is a c extension for Ruby to access TokyoMessenger databases.  It currently supports key/value, table databases and table queries. It does not require Tokyo Cabinet or TokyoMessenger to be installed.
+
+== Install
+
+  sudo gem install gemcutter
+  sudo gem install tokyomessenger
+
+== Performance
+
+This is not in production yet but it will be.  Performance is slighly slower than http://github.com/actsasflinn/ruby-tokyotyrant/ most likely do to the scheduling system.
+
+== Example 
+
+=== Hash DB
+
+  # start tyrant like so:
+  # ttserver example.tch
+
+  require 'tokyo_messenger'
+  db = TokyoMessenger::DB.new('127.0.0.1', 1978)
+
+  db['foo'] = 'Bar' # => "Bar"
+  db['foo']         # => "Bar"
+
+  db.each{ |k,v| puts [k, v].inspect }
+  # ["foo", "Bar"]
+  # => nil
+
+  db.mput("1"=>"number_1", "2"=>"number_2", "3"=>"number_3", "4"=>"number_4", "5"=>"number_5")
+  db.mget(1..3) # => {"1"=>"number_1", "2"=>"number_2", "3"=>"number_3"}
+
+=== Table DB
+
+  # start tyrant like so:
+  # ttserver example.tct
+
+  require 'tokyo_messenger'
+  t = TokyoMessenger::Table.new('127.0.0.1', 1978)
+
+  t['bar'] = { :baz => 'box' } # => { :baz => 'box' }
+  t['bar']                     # => { :baz => 'box' }
+
+  t.each{ |k,v| puts [k, v].inspect }
+  # ["bar", {:baz=>"box"}]
+  # => nil
+
+  # bulk operations
+  h = {}
+  100.times do |i|
+    h[i] = { :name => 'Pat', :sex => i % 2 > 0 ? 'male' : 'female' }
+  end
+  t.mput(h)
+  t.mget(0..3)
+  # => {"0"=>{:name=>"Pat", :sex=>"female"}, "1"=>{:name=>"Pat", :sex=>"male"}, "2"=>{:name=>"Pat", :sex=>"female"}, "3"=>{:name=>"Pat", :sex=>"male"}}
+
+=== Table Query
+
+  require 'tokyo_messenger'
+  t = TokyoMessenger::Table.new('127.0.0.1', 1978)
+
+  100.times do |i|
+    t[i] = { 'name' => "Pat #{i}", 'sex' => i % 2 > 0 ? 'male' : 'female' }
+  end
+
+  q = t.query
+  q.condition('sex', :streq, 'male')
+  q.limit(5)
+  # Get a list of IDs
+  ids = q.search
+  # => ["1", "3", "5", "7", "9"]
+  q.order_by(:name, :strdesc)
+  ids = q.search
+  # => ["99", "97", "95", "93", "91"]
+  # Get the actual records
+  q.get
+  # => [{:__id=>"99", :sex=>"male", :name=>"Pat 99"}, {:__id=>"97", :sex=>"male", :name=>"Pat 97"}, {:__id=>"95", :sex=>"male", :name=>"Pat 95"}, {:__id=>"93", :sex=>"male", :name=>"Pat 93"}, {:__id=>"91", :sex=>"male", :name=>"Pat 91"}]
+
+  # Alternative Syntax (better)
+
+  # Query using a block
+  t.query{ |q|
+    q.condition('sex', :streq, 'male')
+    q.limit(5)
+  }
+  # => ["1", "3", "5", "7", "9"]
+
+  # Get records for a query
+  t.find{ |q|
+    q.condition('sex', :streq, 'male')
+    q.limit(5)
+  }
+  # => [{:sex=>"male", :name=>"Pat 1", :__id=>"1"}, {:sex=>"male", :name=>"Pat 3", :__id=>"3"}, {:sex=>"male", :name=>"Pat 5", :__id=>"5"}, {:sex=>"male", :name=>"Pat 7", :__id=>"7"}, {:sex=>"male", :name=>"Pat 9", :__id=>"9"}]
+
+  # Prepare but don't run a search, return a prepared query object
+  q = t.prepare_query{ |q|
+    q.condition('sex', :streq, 'male')
+    q.limit(5)
+  }
+  # => #<TokyoMessenger::Query:0x247c14 @rdb=#<Object:0x2800a0>, @rdbquery=#<Object:0x247c00>>
+  q.search
+  # => ["1", "3", "5", "7", "9"]
+  q.get
+  # => [{:sex=>"male", :name=>"Pat 1", :__id=>"1"}, {:sex=>"male", :name=>"Pat 3", :__id=>"3"}, {:sex=>"male", :name=>"Pat 5", :__id=>"5"}, {:sex=>"male", :name=>"Pat 7", :__id=>"7"}, {:sex=>"male", :name=>"Pat 9", :__id=>"9"}]
+
+=== Full Text Search
+
+  require 'tokyo_messenger'
+  require 'nokogiri'
+  require 'open-uri'
+
+  t = TokyoMessenger::Table.new('127.0.0.1', 1978)
+
+  (1..13).each do |n|
+    doc = Nokogiri::HTML(open("http://www.sacred-texts.com/chr/herm/hermes#{n}.htm"))
+    chapter = doc.css('h2').last.inner_text.gsub(/\n/, '').gsub(/ +/, ' ').strip
+    doc.css('p').each_with_index do |paragraph, i|
+      paragraph = paragraph.inner_text.gsub(/\n/, '').gsub(/ +/, ' ').strip
+      key = "chapter:#{n}:paragraph:#{i+1}"
+      t[key] = { :chapter => chapter, :paragraph => paragraph }
+    end
+  end
+
+  # full-text search with the phrase of
+  t.query{ |q| q.condition(:paragraph, :fts, 'rebirth') }
+  # => ["chapter:13:paragraph:4", "chapter:13:paragraph:5", "chapter:13:paragraph:7", "chapter:13:paragraph:19", "chapter:13:paragraph:27", "chapter:13:paragraph:44", "chapter:13:paragraph:57", "chapter:13:paragraph:69", "chapter:13:paragraph:125"]
+
+  # full-text search with all tokens in
+  t.query{ |q| q.condition(:paragraph, :ftsand, 'logos word') }
+  # => ["chapter:1:paragraph:12", "chapter:1:paragraph:14", "chapter:1:paragraph:17", "chapter:1:paragraph:19", "chapter:1:paragraph:24", "chapter:1:paragraph:27", "chapter:1:paragraph:43", "chapter:1:paragraph:53", "... lots more ..."]
+
+  # full-text search with at least one token in
+  t.query{ |q| q.condition(:paragraph, :ftsor, 'sermon key') }
+  # => ["chapter:5:paragraph:1", "chapter:9:paragraph:3", "chapter:10:paragraph:1", "chapter:10:paragraph:4", "chapter:10:paragraph:28", "chapter:11:paragraph:3", "chapter:11:paragraph:66", "chapter:11:paragraph:69", "... lots more ..."]
+
+  # negated full-text search with at least one token in
+  t.query{ |q| q.condition(:paragraph, '!ftsor', 'the god he and I that said') }
+  # => ["chapter:1:paragraph:95", "chapter:1:paragraph:96", "chapter:1:paragraph:97", "chapter:1:paragraph:98", "chapter:1:paragraph:99", "chapter:2:paragraph:3", "chapter:2:paragraph:5", "chapter:2:paragraph:6", "... lots more ..."]
+
+==== Meta Search (Multi Query)
+
+  query1 = t.prepare_query{ |q| q.condition(:paragraph, :fts, 'rebirth') }
+  query2 = t.prepare_query{ |q| q.condition(:paragraph, :fts, 'logos') }
+
+  # Get the union of two query sets (OR)
+  t.search(:union, query1, query2)
+  # => ["chapter:13:paragraph:4", "chapter:13:paragraph:5", "chapter:13:paragraph:7", "chapter:13:paragraph:19", "chapter:13:paragraph:27", "chapter:13:paragraph:44", "chapter:13:paragraph:57", "... lots more ..."]
+
+  # Get the intersection of two query sets (AND)
+  t.search(:intersection, query1, query2)
+  # => ["chapter:13:paragraph:5", "chapter:13:paragraph:44", "chapter:13:paragraph:69"]
+
+  # Get the difference of two query sets (ANDNOT)
+  t.search(:diff, query1, query2)
+  # => ["chapter:13:paragraph:4", "chapter:13:paragraph:7", "chapter:13:paragraph:19", "chapter:13:paragraph:27", "chapter:13:paragraph:57", "chapter:13:paragraph:125"]
+
+=== Parallel Querying (Take that scalability!)
+
+  require 'tokyo_messenger'
+  require 'faker'
+  tyrants = { 1 => TokyoMessenger::Table.new('127.0.0.1', 1978),
+              2 => TokyoMessenger::Table.new('127.0.0.1', 1979) }
+
+  # dummy data
+  tyrants.each{ |account_id, table|
+    table.clear
+    20.times do |i|
+      table["#{account_id}/#{i}"] = { # consistent hashing would be good here
+        :name => Faker::Company.name,
+        :plan => rand(3),
+      }
+    end
+  }
+
+  queries = tyrants.collect{ |account_id, table|
+    table.prepare_query{ |q| q.condition 'plan', :numlt, '1' }
+  }
+
+  TokyoMessenger::Query.parallel_search(*queries).collect{ |r| {r[""] => r["name"]} }
+  # => [{"1/3"=>"Zemlak-Jerde"}, {"1/6"=>"O'Conner-Batz"}, {"1/9"=>"Kutch, Erdman and Aufderhar"}, {"1/11"=>"Bartoletti, Armstrong and Barrows"}, {"1/12"=>"Ferry-Dicki"}, {"2/0"=>"Schultz-O'Hara"}, {"2/1"=>"Emmerich, Feest and Huels"}, {"2/2"=>"Borer and Sons"}, {"2/3"=>"D'Amore Inc"}, {"2/5"=>"Koch and Sons"}, {"2/8"=>"Schaefer Group"}, {"2/11"=>"Stroman, Toy and Abernathy"}, {"2/19"=>"Gaylord, Reinger and White"}]
+
+=== Lua Extension
+
+  # ttserver -ext spec/ext.lua 
+  require 'tokyo_messenger'
+  t = TokyoMessenger::Table.new('127.0.0.1', 1978)
+
+  t.run(:echo, 'hello', 'world')
+  # => "hello\tworld"
+
+=== Balanced Nodes with Consistent Hashing
+
+  # usage is similar to single node
+  require 'tokyo_messenger/balancer'
+
+  servers = ['127.0.0.1:1978',
+             '127.0.0.1:1979',
+             '127.0.0.1:1980',
+             '127.0.0.1:1981']
+
+  tb = TokyoMessenger::Balancer::Table.new(servers)
+
+  # store server is determined by key which is consistent
+  tb[:foo] = { 'foo' => 'bar' }
+  tb[:bar] = { 'bar' => 'baz' }
+
+  # retrieval server is determined by key which is consistent
+  tb[:foo]
+  # => { 'foo' => 'bar' }
+
+  # aggregate from all nodes
+  tb.size
+
+  # parallel_search based querying across all nodes
+  tb.find{ |q| q.condition(:foo, :streq, 'bar') }
+
+== Contributors
+
+* Flinn Mueller (actsasflinn) inspiration (ruby-tokyotyrant)
+* Justin Reagor (cheapRoc) specs
+* Seth Yates (sethyates) run method (lua ext)
+* John Mettraux (jmettraux) inspiration (rufus-tokyo)
