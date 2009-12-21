@@ -199,7 +199,7 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <aio.h>
+// #include <aio.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>

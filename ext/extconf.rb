@@ -22,6 +22,6 @@ if RUBY_VERSION < '1.8.6'
   $CFLAGS << ' -DRUBY_LESS_THAN_186'
 end
 
-$CFLAGS << ' -std=c99'
+$CFLAGS << ' -DNDEBUG -D_GNU_SOURCE=1 -fsigned-char -std=c99'
 
 create_makefile 'tokyo_messenger'
