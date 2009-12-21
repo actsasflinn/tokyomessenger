@@ -53,7 +53,7 @@ Rake::GemPackageTask.new(gemspec) do |pkg|
   pkg.need_tar = true
 end
 
-Rake::PackageTask.new('heroku-tokyomessenger', '0.5') do |pkg|
+Rake::PackageTask.new('tokyomessenger', '0.5') do |pkg|
   pkg.need_zip = true
   pkg.package_files = FileList[
     'COPYING',

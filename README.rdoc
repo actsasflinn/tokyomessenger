@@ -217,6 +217,7 @@ This is not in production yet but it will be.  Performance is slighly slower tha
 
 == Contributors
 
+* Matt Bauer (mattbauer) author
 * Flinn Mueller (actsasflinn) inspiration (ruby-tokyotyrant)
 * Justin Reagor (cheapRoc) specs
 * Seth Yates (sethyates) run method (lua ext)
