@@ -217,8 +217,8 @@ This is not in production yet but it will be.  Performance is slighly slower tha
 
 == Contributors
 
-* Matt Bauer (mattbauer) author
-* Flinn Mueller (actsasflinn) inspiration (ruby-tokyotyrant)
+* Matt Bauer (mattbauer) packager (tokyomessenger)
+* Flinn Mueller (actsasflinn) original author (ruby-tokyotyrant)
 * Justin Reagor (cheapRoc) specs
 * Seth Yates (sethyates) run method (lua ext)
 * John Mettraux (jmettraux) inspiration (rufus-tokyo)
