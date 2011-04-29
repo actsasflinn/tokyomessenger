@@ -1,6 +1,6 @@
 = TokyoMessenger Ruby Client In C
 
-This is a c extension for Ruby to access TokyoMessenger databases.  It currently supports key/value, table databases and table queries. It does not require Tokyo Cabinet or TokyoMessenger to be installed.
+This is a c extension for Ruby to access Tokyo Tyrant databases.  It currently supports key/value, table databases and table queries. It does not require Tokyo Cabinet or Tokyo Tyrant to be installed.
 
 == Install
 
